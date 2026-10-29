@@ -44,6 +44,20 @@ brew install bettercapture
 
 Download the latest release from [GitHub Releases](https://github.com/jsattler/BetterCapture/releases/latest) and open `BetterCapture.dmg`.
 
+### From Source
+
+With Xcode installed, run:
+
+```bash
+scripts/install.sh
+```
+
+This builds BetterCapture and installs it to `/Applications`, replacing any copy already there. It quits BetterCapture first, so finish any recording before you run it.
+
+It signs the app with your Apple Development certificate, so macOS keeps its permissions when you reinstall. To get a certificate, add your Apple ID in Xcode → Settings → Accounts, then choose Manage Certificates… → + → Apple Development. If you can sign with more than one team, set `DEVELOPMENT_TEAM` to pick one. The first time, macOS may ask you to confirm opening the app, because it's signed differently from the official release.
+
+Builds from source don't update themselves: pull and run the script again. If you installed with Homebrew, run `brew uninstall bettercapture` first, so Homebrew doesn't later replace or remove your build.
+
 **Requirements**: macOS 15.2 (Sequoia) or later
 
 ## Automation
