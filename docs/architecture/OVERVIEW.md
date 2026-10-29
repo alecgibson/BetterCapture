@@ -105,6 +105,7 @@ BetterCapture supports flexible combinations of codecs and containers, managed b
 
 - **MOV (QuickTime)**: The preferred format. Supports all features including Alpha Channel, HDR, and uncompressed audio (PCM).
 - **MP4 (MPEG-4)**: A widely compatible format. Restricted to H.264/HEVC and AAC audio. Does not support Alpha Channel or HDR.
+- **GIF**: Recorded as an intermediate H.264 MP4, then converted to a looping animated GIF when recording stops. No audio, Alpha Channel or HDR. See [Output Settings](OUTPUT.md#gif).
 
 ### Supported Codecs
 

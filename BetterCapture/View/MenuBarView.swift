@@ -32,6 +32,11 @@ struct MenuBarView: View {
                 MenuBarDivider()
             }
 
+            if let gifExportProgress = viewModel.gifExportProgress {
+                GIFExportBanner(progress: gifExportProgress)
+                MenuBarDivider()
+            }
+
             // Recording button (stop + timer) or Start button
             if isRecording {
                 RecordingButton(

@@ -334,6 +334,9 @@ struct SettingsStoreTests {
 
         store.containerFormat = .mp4
         #expect(store.generateFilename().hasSuffix(".mp4"))
+
+        store.containerFormat = .gif
+        #expect(store.generateFilename().hasSuffix(".gif"))
     }
 
     // MARK: - Output Directory

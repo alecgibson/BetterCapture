@@ -93,6 +93,7 @@ enum VideoCodec: String, CaseIterable, Identifiable {
 enum ContainerFormat: String, CaseIterable, Identifiable {
     case mov
     case mp4
+    case gif
 
     var id: String { rawValue }
 
@@ -107,6 +108,9 @@ enum ContainerFormat: String, CaseIterable, Identifiable {
         case .mp4:
             // MP4 (MPEG-4) only supports H.264 and HEVC (without alpha)
             return [.h264, .hevc]
+        case .gif:
+            // GIF is converted from an intermediate H.264 recording
+            return [.h264]
         }
     }
 
@@ -117,6 +121,8 @@ enum ContainerFormat: String, CaseIterable, Identifiable {
             return true
         case .mp4:
             // MP4 does not support alpha channel (HEVC with alpha or ProRes 4444)
+            return false
+        case .gif:
             return false
         }
     }
@@ -130,7 +136,14 @@ enum ContainerFormat: String, CaseIterable, Identifiable {
         case .mp4:
             // MP4 only supports AAC (not raw PCM)
             return [.aac]
+        case .gif:
+            return []
         }
+    }
+
+    /// Whether this container can hold audio tracks
+    var supportsAudio: Bool {
+        !supportedAudioCodecs.isEmpty
     }
 }
 
@@ -167,8 +180,7 @@ enum FrameRate: Int, CaseIterable, Identifiable {
     /// higher ceiling produced a heavily variable frame rate that broke
     /// concatenation and upload tools without adding useful frames.
     ///
-    /// `CaptureEngine` uses this for `minimumFrameInterval`, `AssetWriter` uses it
-    /// as the constant frame rate grid, and both use it for the bitrate budget.
+    /// `SettingsStore.captureFrameRate` uses this for MOV and MP4 recordings.
     var effectiveFrameRate: Double {
         switch self {
         case .native: 60.0
@@ -262,6 +274,24 @@ final class SettingsStore {
         }
     }
 
+    var gifFrameRate: GIFFrameRate {
+        get {
+            GIFFrameRate(rawValue: gifFrameRateRaw) ?? .fps20
+        }
+        set {
+            gifFrameRateRaw = newValue.rawValue
+        }
+    }
+
+    /// The frame rate in Hz the recording is captured and written at.
+    ///
+    /// GIF recordings use `gifFrameRate`, so the intermediate video holds exactly the frames the
+    /// GIF shows. `CaptureEngine` uses this for `minimumFrameInterval`, `AssetWriter` uses it as
+    /// the constant frame rate grid, and both use it for the bitrate budget.
+    var captureFrameRate: Double {
+        containerFormat == .gif ? Double(gifFrameRate.rawValue) : frameRate.effectiveFrameRate
+    }
+
     var videoQuality: VideoQuality {
         get {
             VideoQuality(rawValue: videoQualityRaw) ?? .medium
@@ -319,7 +349,7 @@ final class SettingsStore {
             // Ensure current video codec is compatible with new container
             if !newValue.supportedVideoCodecs.contains(videoCodec) {
                 // Switch to a compatible codec (prefer HEVC for quality)
-                videoCodec = .hevc
+                videoCodec = newValue.supportedVideoCodecs.contains(.hevc) ? .hevc : .h264
             }
 
             // Disable alpha channel if container doesn't support it
@@ -328,7 +358,7 @@ final class SettingsStore {
             }
 
             // Ensure current audio codec is compatible with new container
-            if !newValue.supportedAudioCodecs.contains(audioCodec) {
+            if newValue.supportsAudio && !newValue.supportedAudioCodecs.contains(audioCodec) {
                 audioCodec = .aac
             }
         }
@@ -413,6 +443,7 @@ final class SettingsStore {
     var captureMicrophone: Bool {
         get {
             access(keyPath: \.captureMicrophone)
+            guard containerFormat.supportsAudio else { return false }
             return defaults.bool(forKey: "captureMicrophone")
         }
         set {
@@ -425,6 +456,7 @@ final class SettingsStore {
     var captureSystemAudio: Bool {
         get {
             access(keyPath: \.captureSystemAudio)
+            guard containerFormat.supportsAudio else { return false }
             return defaults.object(forKey: "captureSystemAudio") as? Bool ?? true
         }
         set {
@@ -681,6 +713,21 @@ final class SettingsStore {
         set {
             withMutation(keyPath: \.frameRateRaw) {
                 defaults.set(newValue, forKey: "frameRate")
+            }
+        }
+    }
+
+    private var gifFrameRateRaw: Int {
+        get {
+            access(keyPath: \.gifFrameRateRaw)
+            guard defaults.object(forKey: "gifFrameRate") != nil else {
+                return GIFFrameRate.fps20.rawValue
+            }
+            return defaults.integer(forKey: "gifFrameRate")
+        }
+        set {
+            withMutation(keyPath: \.gifFrameRateRaw) {
+                defaults.set(newValue, forKey: "gifFrameRate")
             }
         }
     }

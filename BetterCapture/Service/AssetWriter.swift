@@ -119,7 +119,7 @@ final class AssetWriter: CaptureEngineSampleBufferDelegate, @unchecked Sendable 
 
         // Snap video to a constant frame rate grid. `.native` reports 60, which is
         // also the interval CaptureEngine configures for it.
-        gridFrameRate = CMTimeScale(settings.frameRate.effectiveFrameRate)
+        gridFrameRate = CMTimeScale(settings.captureFrameRate)
 
         // Configure video input
         let videoSettings = AssetWriterSettings.video(from: settings, size: videoSize)

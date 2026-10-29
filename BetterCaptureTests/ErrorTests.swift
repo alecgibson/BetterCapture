@@ -74,4 +74,14 @@ struct ErrorTests {
         let error = CaptureError.cameraPermissionDenied
         #expect(error.errorDescription?.localizedStandardContains("permission") == true)
     }
+
+    // MARK: - GIFExporterError
+
+    @Test func gifExporterErrorDescriptions() {
+        let cases: [GIFExporterError] = [.failedToReadVideo, .failedToEncodeFrame]
+
+        for error in cases {
+            #expect(error.errorDescription?.isEmpty == false)
+        }
+    }
 }

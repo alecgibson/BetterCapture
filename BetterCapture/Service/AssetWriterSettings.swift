@@ -45,7 +45,7 @@ enum AssetWriterSettings {
         // Add compression properties for H.264 and HEVC to control bitrate.
         // ProRes codecs use fixed-quality encoding and don't need these.
         if let bpp = settings.videoQuality.bitsPerPixel(for: settings.videoCodec) {
-            let frameRate = settings.frameRate.effectiveFrameRate
+            let frameRate = settings.captureFrameRate
             let bitrate = Int(size.width * size.height * bpp * frameRate)
 
             var compressionProperties: [String: Any] = [
