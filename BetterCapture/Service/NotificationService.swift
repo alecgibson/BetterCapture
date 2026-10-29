@@ -132,6 +132,19 @@ final class NotificationService: NSObject {
         )
     }
 
+    /// Sends a notification for a recording that was saved in full because the trim failed
+    /// - Parameters:
+    ///   - fileURL: The URL of the saved recording file
+    ///   - error: The error that stopped the trim
+    func sendTrimFailedNotification(fileURL: URL, error: Error) {
+        send(
+            title: "Recording Saved Untrimmed",
+            body: "The full recording was saved to \(fileURL.lastPathComponent) because it could not be trimmed: \(error.localizedDescription)",
+            category: NotificationIdentifier.categoryRecordingSaved,
+            folderURL: fileURL.deletingLastPathComponent()
+        )
+    }
+
     /// Sends a notification for a recording that could not be started
     ///
     /// Start failures leave nothing on disk, so they are reported separately from

@@ -79,6 +79,11 @@ struct SettingsStoreTests {
         #expect(store.showBetterCapture == false)
     }
 
+    @Test func defaultTrimBeforeSavingIsFalse() {
+        let store = makeStore()
+        #expect(store.trimBeforeSaving == false)
+    }
+
     @Test func defaultCaptureSystemAudioIsTrue() {
         let store = makeStore()
         #expect(store.captureSystemAudio == true)
@@ -413,6 +418,9 @@ struct SettingsStoreTests {
 
         store.captureNativeResolution = false
         #expect(store.captureNativeResolution == false)
+
+        store.trimBeforeSaving = true
+        #expect(store.trimBeforeSaving == true)
     }
 
     // MARK: - Complex Cascade Scenarios
