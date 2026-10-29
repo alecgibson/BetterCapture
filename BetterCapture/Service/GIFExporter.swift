@@ -20,6 +20,19 @@ nonisolated enum GIFExporter {
         framesPerSecond: Int,
         progress: @MainActor (Double) -> Void
     ) async throws {
+        try await withTaskExecutorPreference(BlockingIOExecutor()) {
+            try await writeGIF(videoAt: sourceURL, to: destinationURL, framesPerSecond: framesPerSecond, progress: progress)
+        }
+    }
+
+    /// Does the work of `export`, reading frames with calls that block.
+    @concurrent
+    private static func writeGIF(
+        videoAt sourceURL: URL,
+        to destinationURL: URL,
+        framesPerSecond: Int,
+        progress: @MainActor (Double) -> Void
+    ) async throws {
         let asset = AVURLAsset(url: sourceURL)
         let duration = try await asset.load(.duration)
         let durationInFrames = duration.convertScale(CMTimeScale(framesPerSecond), method: .roundTowardPositiveInfinity)

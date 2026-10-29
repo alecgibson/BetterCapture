@@ -121,6 +121,25 @@ struct GIFExporterTests {
         #expect(progress == (1...10).map { Double($0) / 10 })
     }
 
+    @Test func moreExportsAtOnceThanThereAreCoresAllFinish() async throws {
+        let movieURL = try await TestMovie.make(frameCount: Int(TestMovie.framesPerSecond))
+        defer { try? FileManager.default.removeItem(at: movieURL) }
+        let exportCount = ProcessInfo.processInfo.activeProcessorCount * 2
+        let gifURLs = (0..<exportCount).map { _ in makeGIFURL() }
+        defer { gifURLs.forEach { try? FileManager.default.removeItem(at: $0) } }
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for gifURL in gifURLs {
+                group.addTask {
+                    try await GIFExporter.export(videoAt: movieURL, to: gifURL, framesPerSecond: 10) { _ in }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        #expect(gifURLs.allSatisfy { FileManager.default.fileExists(atPath: $0.path()) })
+    }
+
     @Test func gifRecordingCreatesTheGIFFolderUpFront() throws {
         let folderURL = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folderURL) }
