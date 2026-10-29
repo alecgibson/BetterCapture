@@ -15,14 +15,6 @@ import OSLog
 @Observable
 final class RecorderViewModel {
 
-    // MARK: - Recording State
-
-    enum RecordingState {
-        case idle
-        case recording
-        case stopping
-    }
-
     // MARK: - Published Properties
 
     private(set) var state: RecordingState = .idle
@@ -329,6 +321,7 @@ final class RecorderViewModel {
 
             // Finalize file
             let (recordingURL, videoFrameCount) = try await assetWriter.finishWriting()
+            let trimError = await trimIfRequested(recordingURL)
             let (outputURL, gifExportError) = await exportGIFIfNeeded(from: recordingURL)
 
             state = .idle
@@ -345,7 +338,7 @@ final class RecorderViewModel {
                 logger.error("Recording contains no video frames: \(outputURL.lastPathComponent)")
                 notificationService.sendRecordingMissingVideoNotification(fileURL: outputURL)
             } else {
-                sendSavedNotification(fileURL: outputURL, gifExportError: gifExportError)
+                sendSavedNotification(fileURL: outputURL, gifExportError: gifExportError, trimError: trimError)
             }
 
             if copyToClipboard {
@@ -486,6 +479,18 @@ final class RecorderViewModel {
     }
 }
 
+// MARK: - Recording State
+
+extension RecorderViewModel {
+
+    enum RecordingState {
+        case idle
+        case recording
+        case trimming
+        case stopping
+    }
+}
+
 // MARK: - CaptureEngineDelegate
 
 extension RecorderViewModel: CaptureEngineDelegate {
@@ -596,6 +601,25 @@ extension RecorderViewModel {
         try assetWriter.setup(url: gifRecording?.videoURL ?? outputURL, settings: settings, videoSize: videoSize)
     }
 
+    /// Lets the user trim the finished recording in place, if they have asked to.
+    /// - Returns: The error if the trim the user chose could not be made, in which case the full recording is kept
+    private func trimIfRequested(_ url: URL) async -> Error? {
+        guard settings.trimBeforeSaving else { return nil }
+
+        state = .trimming
+        let timeRange = await TrimWindow.trimRange(forVideoAt: url)
+        state = .stopping
+
+        guard let timeRange else { return nil }
+        do {
+            try await VideoTrimmer.trim(videoAt: url, to: timeRange)
+            return nil
+        } catch {
+            logger.error("Trim failed, keeping the full recording: \(error.localizedDescription)")
+            return error
+        }
+    }
+
     /// How much of the GIF has been written while a finished GIF recording is converted
     var gifExportProgress: Double? {
         state == .stopping ? gifRecording?.exportProgress : nil
@@ -615,9 +639,11 @@ extension RecorderViewModel {
         return (url, exportError)
     }
 
-    private func sendSavedNotification(fileURL: URL, gifExportError: Error?) {
+    private func sendSavedNotification(fileURL: URL, gifExportError: Error?, trimError: Error?) {
         if let gifExportError {
             notificationService.sendGIFExportFailedNotification(fileURL: fileURL, error: gifExportError)
+        } else if let trimError {
+            notificationService.sendTrimFailedNotification(fileURL: fileURL, error: trimError)
         } else {
             notificationService.sendRecordingSavedNotification(fileURL: fileURL)
         }

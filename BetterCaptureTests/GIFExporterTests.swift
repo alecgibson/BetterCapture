@@ -12,19 +12,15 @@ import UniformTypeIdentifiers
 @MainActor
 struct GIFExporterTests {
 
-    private static let blackPixel: [UInt8] = [0, 0, 0, 255]
     private static let redPixel: [UInt8] = [0, 0, 255, 255]
     private static let bluePixel: [UInt8] = [255, 0, 0, 255]
-
-    private let videoSize = CGSize(width: 640, height: 480)
-    private let sourceMovieFramesPerSecond: Int32 = 30
 
     // MARK: - Tests
 
     @Test(arguments: GIFFrameRate.allCases)
     func exportsLoopingGIFAtTheGIFFrameRate(rate: GIFFrameRate) async throws {
-        let oneSecondOfFrames = Int(sourceMovieFramesPerSecond)
-        let movieURL = try await makeMovie(frameCount: oneSecondOfFrames)
+        let oneSecondOfFrames = Int(TestMovie.framesPerSecond)
+        let movieURL = try await TestMovie.make(frameCount: oneSecondOfFrames)
         defer { try? FileManager.default.removeItem(at: movieURL) }
         let gifURL = makeGIFURL()
         defer { try? FileManager.default.removeItem(at: gifURL) }
@@ -40,8 +36,8 @@ struct GIFExporterTests {
         #expect(fileGIFProperties[kCGImagePropertyGIFLoopCount] as? Int == 0)
 
         let frameProperties = try #require(CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any])
-        #expect(frameProperties[kCGImagePropertyPixelWidth] as? Int == Int(videoSize.width))
-        #expect(frameProperties[kCGImagePropertyPixelHeight] as? Int == Int(videoSize.height))
+        #expect(frameProperties[kCGImagePropertyPixelWidth] as? Int == Int(TestMovie.size.width))
+        #expect(frameProperties[kCGImagePropertyPixelHeight] as? Int == Int(TestMovie.size.height))
 
         let frameGIFProperties = try #require(frameProperties[kCGImagePropertyGIFDictionary] as? [CFString: Any])
         let delay = try #require(frameGIFProperties[kCGImagePropertyGIFUnclampedDelayTime] as? Double)
@@ -50,7 +46,7 @@ struct GIFExporterTests {
 
     @Test func partialTrailingFrameIsKept() async throws {
         // 35 frames at 30 fps is 1.17s, which needs 23.3 GIF frames at 20 fps
-        let movieURL = try await makeMovie(frameCount: 35)
+        let movieURL = try await TestMovie.make(frameCount: 35)
         defer { try? FileManager.default.removeItem(at: movieURL) }
         let gifURL = makeGIFURL()
         defer { try? FileManager.default.removeItem(at: gifURL) }
@@ -63,7 +59,7 @@ struct GIFExporterTests {
 
     @Test func wholeNumberOfGIFFramesGetsNoExtraFrame() async throws {
         // 33 frames at 30 fps is 1.1s, which is 55 GIF frames at 50 fps, but 1.1 * 50 is 55.00000000000001 as a Double
-        let movieURL = try await makeMovie(frameCount: 33)
+        let movieURL = try await TestMovie.make(frameCount: 33)
         defer { try? FileManager.default.removeItem(at: movieURL) }
         let gifURL = makeGIFURL()
         defer { try? FileManager.default.removeItem(at: gifURL) }
@@ -75,8 +71,8 @@ struct GIFExporterTests {
     }
 
     @Test func eachGIFFrameShowsTheVideoFrameOnScreenAtThatTime() async throws {
-        let halfASecondOfFrames = Int(sourceMovieFramesPerSecond) / 2
-        let movieURL = try await makeMovie(frameCount: halfASecondOfFrames * 2) { frame in
+        let halfASecondOfFrames = Int(TestMovie.framesPerSecond) / 2
+        let movieURL = try await TestMovie.make(frameCount: halfASecondOfFrames * 2) { frame in
             frame < halfASecondOfFrames ? Self.redPixel : Self.bluePixel
         }
         defer { try? FileManager.default.removeItem(at: movieURL) }
@@ -92,8 +88,29 @@ struct GIFExporterTests {
         #expect(isClose(firstBlueFrame, to: Self.bluePixel))
     }
 
+    @Test func gifOfATrimmedRecordingStartsExactlyAtTheTrimPoint() async throws {
+        let fps = Int(TestMovie.framesPerSecond)
+        let movieURL = try await TestMovie.make(frameCount: fps * 2) { frame in
+            frame < fps * 3 / 2 ? Self.redPixel : Self.bluePixel
+        }
+        defer { try? FileManager.default.removeItem(at: movieURL) }
+        let gifURL = makeGIFURL()
+        defer { try? FileManager.default.removeItem(at: gifURL) }
+
+        let lastSecond = CMTimeRange(start: CMTime(value: 1, timescale: 1), end: CMTime(value: 2, timescale: 1))
+        try await VideoTrimmer.trim(videoAt: movieURL, to: lastSecond)
+        try await GIFExporter.export(videoAt: movieURL, to: gifURL, framesPerSecond: 10) { _ in }
+
+        let source = try #require(CGImageSourceCreateWithURL(gifURL as CFURL, nil))
+        let lastRedFrame = try pixel(ofFrame: 4, in: source)
+        let firstBlueFrame = try pixel(ofFrame: 5, in: source)
+        #expect(CGImageSourceGetCount(source) == 10)
+        #expect(isClose(lastRedFrame, to: Self.redPixel))
+        #expect(isClose(firstBlueFrame, to: Self.bluePixel))
+    }
+
     @Test func reportsProgressAfterEachGIFFrame() async throws {
-        let movieURL = try await makeMovie(frameCount: Int(sourceMovieFramesPerSecond))
+        let movieURL = try await TestMovie.make(frameCount: Int(TestMovie.framesPerSecond))
         defer { try? FileManager.default.removeItem(at: movieURL) }
         let gifURL = makeGIFURL()
         defer { try? FileManager.default.removeItem(at: gifURL) }
@@ -130,7 +147,7 @@ struct GIFExporterTests {
         let gifURL = makeGIFURL()
         defer { try? FileManager.default.removeItem(at: gifURL) }
         let recording = try GIFRecording(gifURL: gifURL, framesPerSecond: 20)
-        let movieURL = try await makeMovie(frameCount: 1)
+        let movieURL = try await TestMovie.make(frameCount: 1)
         try FileManager.default.moveItem(at: movieURL, to: recording.videoURL)
 
         let (url, exportError) = await recording.finish()
@@ -185,7 +202,7 @@ struct GIFExporterTests {
     private func makeGIFRecordingThatFailsToExport(to gifURL: URL) async throws -> GIFRecording {
         let recording = try GIFRecording(gifURL: gifURL, framesPerSecond: 20)
         try FileManager.default.createDirectory(at: gifURL, withIntermediateDirectories: true)
-        let movieURL = try await makeMovie(frameCount: 1)
+        let movieURL = try await TestMovie.make(frameCount: 1)
         try FileManager.default.moveItem(at: movieURL, to: recording.videoURL)
         return recording
     }
@@ -210,64 +227,5 @@ struct GIFExporterTests {
 
     private func isClose(_ pixel: [UInt8], to expected: [UInt8]) -> Bool {
         zip(pixel, expected).allSatisfy { abs(Int($0) - Int($1)) < 40 }
-    }
-
-    /// Writes an H.264 movie at `sourceMovieFramesPerSecond`, each frame filled with one BGRA pixel.
-    private func makeMovie(
-        frameCount: Int,
-        pixelOfFrame: (Int) -> [UInt8] = { _ in GIFExporterTests.blackPixel }
-    ) async throws -> URL {
-        let url = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).mp4")
-        let writer = try AVAssetWriter(outputURL: url, fileType: .mp4)
-        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: Int(videoSize.width),
-            AVVideoHeightKey: Int(videoSize.height)
-        ])
-        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: nil)
-        writer.add(input)
-
-        #expect(writer.startWriting())
-        writer.startSession(atSourceTime: .zero)
-
-        for frame in 0..<frameCount {
-            let pixelBuffer = try makePixelBuffer(filledWith: pixelOfFrame(frame))
-            while !input.isReadyForMoreMediaData {
-                try await Task.sleep(for: .milliseconds(10))
-            }
-            let presentationTime = CMTime(value: CMTimeValue(frame), timescale: sourceMovieFramesPerSecond)
-            #expect(adaptor.append(pixelBuffer, withPresentationTime: presentationTime))
-        }
-
-        input.markAsFinished()
-        writer.endSession(atSourceTime: CMTime(value: CMTimeValue(frameCount), timescale: sourceMovieFramesPerSecond))
-        await writer.finishWriting()
-        #expect(writer.status == .completed)
-
-        return url
-    }
-
-    private func makePixelBuffer(filledWith pixel: [UInt8]) throws -> CVPixelBuffer {
-        var pixelBuffer: CVPixelBuffer?
-        let status = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            Int(videoSize.width),
-            Int(videoSize.height),
-            kCVPixelFormatType_32BGRA,
-            [kCVPixelBufferIOSurfacePropertiesKey as String: [:] as CFDictionary] as CFDictionary,
-            &pixelBuffer
-        )
-        #expect(status == kCVReturnSuccess)
-        let buffer = try #require(pixelBuffer)
-
-        CVPixelBufferLockBaseAddress(buffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-        let baseAddress = try #require(CVPixelBufferGetBaseAddress(buffer))
-        let bytesPerRow = CVPixelBufferGetBytesPerRow(buffer)
-        let row = Array([[UInt8]](repeating: pixel, count: Int(videoSize.width)).joined())
-        for rowIndex in 0..<Int(videoSize.height) {
-            (baseAddress + rowIndex * bytesPerRow).copyMemory(from: row, byteCount: row.count)
-        }
-        return buffer
     }
 }

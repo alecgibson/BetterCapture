@@ -269,6 +269,10 @@ struct GeneralSettingsView: View {
                 }
             }
 
+            Section("Recording") {
+                Toggle("Trim before saving", isOn: $settings.trimBeforeSaving)
+            }
+
             Section("Software Updates") {
                 Toggle("Automatically check for updates", isOn: $updaterService.automaticallyChecksForUpdates)
 
