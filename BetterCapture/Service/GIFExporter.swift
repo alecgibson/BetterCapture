@@ -22,7 +22,8 @@ nonisolated enum GIFExporter {
     ) async throws {
         let asset = AVURLAsset(url: sourceURL)
         let duration = try await asset.load(.duration)
-        let frameCount = max(1, Int((duration.seconds * Double(framesPerSecond)).rounded(.up)))
+        let durationInFrames = duration.convertScale(CMTimeScale(framesPerSecond), method: .roundTowardPositiveInfinity)
+        let frameCount = max(1, Int(durationInFrames.value))
         guard let track = try await asset.loadTracks(withMediaType: .video).first else {
             throw GIFExporterError.failedToReadVideo
         }
