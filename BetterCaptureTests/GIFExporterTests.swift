@@ -61,6 +61,19 @@ struct GIFExporterTests {
         #expect(CGImageSourceGetCount(source) == 24)
     }
 
+    @Test func wholeNumberOfGIFFramesGetsNoExtraFrame() async throws {
+        // 33 frames at 30 fps is 1.1s, which is 55 GIF frames at 50 fps, but 1.1 * 50 is 55.00000000000001 as a Double
+        let movieURL = try await makeMovie(frameCount: 33)
+        defer { try? FileManager.default.removeItem(at: movieURL) }
+        let gifURL = makeGIFURL()
+        defer { try? FileManager.default.removeItem(at: gifURL) }
+
+        try await GIFExporter.export(videoAt: movieURL, to: gifURL, framesPerSecond: 50) { _ in }
+
+        let source = try #require(CGImageSourceCreateWithURL(gifURL as CFURL, nil))
+        #expect(CGImageSourceGetCount(source) == 55)
+    }
+
     @Test func eachGIFFrameShowsTheVideoFrameOnScreenAtThatTime() async throws {
         let halfASecondOfFrames = Int(sourceMovieFramesPerSecond) / 2
         let movieURL = try await makeMovie(frameCount: halfASecondOfFrames * 2) { frame in
