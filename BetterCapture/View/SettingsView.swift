@@ -101,9 +101,17 @@ struct VideoSettingsView: View {
     var body: some View {
         Form {
             Section("Recording") {
-                Picker("Frame Rate", selection: $settings.frameRate) {
-                    ForEach(FrameRate.allCases) { rate in
-                        Text(rate.displayName).tag(rate)
+                if settings.containerFormat == .gif {
+                    Picker("Frame Rate", selection: $settings.gifFrameRate) {
+                        ForEach(GIFFrameRate.allCases) { rate in
+                            Text(rate.displayName).tag(rate)
+                        }
+                    }
+                } else {
+                    Picker("Frame Rate", selection: $settings.frameRate) {
+                        ForEach(FrameRate.allCases) { rate in
+                            Text(rate.displayName).tag(rate)
+                        }
                     }
                 }
 
@@ -171,14 +179,24 @@ struct VideoSettingsView: View {
 struct AudioSettingsView: View {
     @Bindable var settings: SettingsStore
 
+    private var noAudioHelpText: String {
+        "\(settings.containerFormat.rawValue.uppercased()) does not support audio"
+    }
+
     var body: some View {
         Form {
             Section("Sources") {
                 Toggle("Capture System Audio", isOn: $settings.captureSystemAudio)
-                    .help("Record audio from applications and system sounds")
+                    .disabled(!settings.containerFormat.supportsAudio)
+                    .help(settings.containerFormat.supportsAudio
+                        ? "Record audio from applications and system sounds"
+                        : noAudioHelpText)
 
                 Toggle("Capture Microphone", isOn: $settings.captureMicrophone)
-                    .help("Record audio from the default microphone input")
+                    .disabled(!settings.containerFormat.supportsAudio)
+                    .help(settings.containerFormat.supportsAudio
+                        ? "Record audio from the default microphone input"
+                        : noAudioHelpText)
             }
 
             Section("Format") {

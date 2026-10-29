@@ -35,19 +35,25 @@ HEVC uses lower bpp values because it achieves comparable visual quality at roug
 
 ### Video Codecs
 
-| Codec       | Container | Alpha               | HDR (10-bit) | Notes                                                                  |
-| ----------- | --------- | ------------------- | ------------ | ---------------------------------------------------------------------- |
-| H.264       | MOV, MP4  | No                  | No           | 8-bit SDR only                                                         |
-| HEVC        | MOV, MP4  | Optional (MOV only) | Yes          | Default codec. Alpha via `hevcWithAlpha` (mutually exclusive with HDR) |
-| ProRes 422  | MOV only  | No                  | Yes          | 10-bit HDR support                                                     |
-| ProRes 4444 | MOV only  | Always              | Yes          | 10-bit/12-bit HDR, always includes alpha                               |
+| Codec       | Container     | Alpha               | HDR (10-bit) | Notes                                                                  |
+| ----------- | ------------- | ------------------- | ------------ | ---------------------------------------------------------------------- |
+| H.264       | MOV, MP4, GIF | No                  | No           | 8-bit SDR only. Only codec for GIF                                     |
+| HEVC        | MOV, MP4      | Optional (MOV only) | Yes          | Default codec. Alpha via `hevcWithAlpha` (mutually exclusive with HDR) |
+| ProRes 422  | MOV only      | No                  | Yes          | 10-bit HDR support                                                     |
+| ProRes 4444 | MOV only      | Always              | Yes          | 10-bit/12-bit HDR, always includes alpha                               |
 
 ### Audio Codecs
 
-| Codec | MOV | MP4 | Notes                    |
-| ----- | --- | --- | ------------------------ |
-| AAC   | Yes | Yes | Compressed, good quality |
-| PCM   | Yes | No  | Uncompressed, MOV only   |
+| Codec | MOV | MP4 | GIF | Notes                    |
+| ----- | --- | --- | --- | ------------------------ |
+| AAC   | Yes | Yes | No  | Compressed, good quality |
+| PCM   | Yes | No  | No  | Uncompressed, MOV only   |
+
+### GIF
+
+GIF is recorded to an intermediate H.264 MP4 in the temporary directory, then converted with `GIFExporter` when recording stops. Under GIF the Frame Rate picker offers 10, 20 (the default), 25 or 50 fps, since GIF frame delays are whole centiseconds and only rates that divide 100 play back at true speed. Both the capture and the GIF use that rate. The GIF keeps the captured resolution and loops forever.
+
+`GIFFileWriter` writes the GIF one frame at a time, because `CGImageDestination` holds every frame in memory until it is finalized. That ran a 30-second Retina recording past 50 GB. ImageIO still encodes each frame, as a GIF of its own, and the writer copies that frame's image block into the file. The GIF is written to the temporary directory and moved into place once complete. The menu shows how far the conversion has got.
 
 ### Automatic Settings Adjustment
 
@@ -61,11 +67,18 @@ BetterCapture automatically adjusts settings when changing formats to maintain c
 2. **When selecting ProRes codecs:**
    - If container is MP4, switches to MOV.
 
-3. **When enabling alpha channel:**
+3. **When switching to GIF:**
+   - Switches the video codec to H.264, which disables alpha and HDR.
+   - System audio and microphone capture read as off. The stored preferences return when switching back to MOV or MP4.
+   - The Frame Rate picker switches to the GIF rates. The MOV and MP4 frame rate is kept separately and returns when switching back.
+   - While GIF is selected, choosing a video codec other than H.264, or any audio codec, switches the container to MOV.
+   - As with MP4, the codec, alpha and HDR changes stay in place after switching back.
+
+4. **When enabling alpha channel:**
    - Only allowed if the video codec supports alpha AND the container is MOV.
    - HEVC alpha and HDR are mutually exclusive. Enabling one disables the other.
 
-4. **When enabling HDR:**
+5. **When enabling HDR:**
    - HEVC alpha is disabled (Main 10 profile is incompatible with `hevcWithAlpha`).
 
 ## Pixel Format

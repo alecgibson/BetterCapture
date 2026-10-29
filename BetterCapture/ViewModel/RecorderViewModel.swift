@@ -90,6 +90,7 @@ final class RecorderViewModel {
     private var recordingTimer: Timer?
     private var recordingStartTime: Date?
     private var videoSize: CGSize = .zero
+    private var gifRecording: GIFRecording?
     private let areaSelectionOverlay = AreaSelectionOverlay()
     private let selectionBorderFrame = SelectionBorderFrame()
     private let recordingOverlay = RecordingOverlayCoordinator()
@@ -258,8 +259,7 @@ final class RecorderViewModel {
             _ = settings.startAccessingOutputDirectory()
 
             // Setup asset writer
-            let outputURL = settings.generateOutputURL()
-            try assetWriter.setup(url: outputURL, settings: settings, videoSize: videoSize)
+            try setupAssetWriter()
             try assetWriter.startWriting()
             logger.info("AssetWriter ready")
 
@@ -328,7 +328,8 @@ final class RecorderViewModel {
             isPresenterOverlayActive = false
 
             // Finalize file
-            let (outputURL, videoFrameCount) = try await assetWriter.finishWriting()
+            let (recordingURL, videoFrameCount) = try await assetWriter.finishWriting()
+            let (outputURL, gifExportError) = await exportGIFIfNeeded(from: recordingURL)
 
             state = .idle
             recordingDuration = 0
@@ -344,7 +345,7 @@ final class RecorderViewModel {
                 logger.error("Recording contains no video frames: \(outputURL.lastPathComponent)")
                 notificationService.sendRecordingMissingVideoNotification(fileURL: outputURL)
             } else {
-                notificationService.sendRecordingSavedNotification(fileURL: outputURL)
+                sendSavedNotification(fileURL: outputURL, gifExportError: gifExportError)
             }
 
             if copyToClipboard {
@@ -577,5 +578,48 @@ extension RecorderViewModel: PreviewServiceDelegate {
         // Clear the content filter in capture engine and deactivate picker
         captureEngine.clearSelection()
         captureEngine.deactivatePicker()
+    }
+}
+
+// MARK: - Output File
+
+extension RecorderViewModel {
+
+    /// Sets up the asset writer for a new recording. A GIF is recorded to an intermediate video
+    /// first, which `gifRecording` keeps track of until recording stops.
+    private func setupAssetWriter() throws {
+        let outputURL = settings.generateOutputURL()
+        gifRecording = nil
+        if settings.containerFormat == .gif {
+            gifRecording = try GIFRecording(gifURL: outputURL, framesPerSecond: settings.gifFrameRate.rawValue)
+        }
+        try assetWriter.setup(url: gifRecording?.videoURL ?? outputURL, settings: settings, videoSize: videoSize)
+    }
+
+    /// How much of the GIF has been written while a finished GIF recording is converted
+    var gifExportProgress: Double? {
+        state == .stopping ? gifRecording?.exportProgress : nil
+    }
+
+    /// Converts a GIF recording into the GIF the user asked for, if this was one.
+    /// - Returns: The URL of the file to hand to the user, and the export error if it fell back to video
+    private func exportGIFIfNeeded(from recordingURL: URL) async -> (url: URL, gifExportError: Error?) {
+        guard let gifRecording else { return (recordingURL, nil) }
+
+        let (url, exportError) = await gifRecording.finish()
+        if let exportError {
+            logger.error("GIF export failed, keeping the recording as video: \(exportError.localizedDescription)")
+        } else {
+            logger.info("Exported GIF: \(url.lastPathComponent)")
+        }
+        return (url, exportError)
+    }
+
+    private func sendSavedNotification(fileURL: URL, gifExportError: Error?) {
+        if let gifExportError {
+            notificationService.sendGIFExportFailedNotification(fileURL: fileURL, error: gifExportError)
+        } else {
+            notificationService.sendRecordingSavedNotification(fileURL: fileURL)
+        }
     }
 }

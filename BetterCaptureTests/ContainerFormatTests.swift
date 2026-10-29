@@ -24,11 +24,16 @@ struct ContainerFormatTests {
         #expect(!codecs.contains(.proRes4444))
     }
 
+    @Test func gifSupportsOnlyH264() {
+        #expect(ContainerFormat.gif.supportedVideoCodecs == [.h264])
+    }
+
     // MARK: - supportsAlphaChannel
 
     @Test func supportsAlphaChannel() {
         #expect(ContainerFormat.mov.supportsAlphaChannel == true)
         #expect(ContainerFormat.mp4.supportsAlphaChannel == false)
+        #expect(ContainerFormat.gif.supportsAlphaChannel == false)
     }
 
     // MARK: - supportedAudioCodecs
@@ -44,11 +49,24 @@ struct ContainerFormatTests {
         #expect(!codecs.contains(.pcm))
     }
 
+    @Test func gifSupportsNoAudio() {
+        #expect(ContainerFormat.gif.supportedAudioCodecs.isEmpty)
+    }
+
+    // MARK: - supportsAudio
+
+    @Test func supportsAudio() {
+        #expect(ContainerFormat.mov.supportsAudio == true)
+        #expect(ContainerFormat.mp4.supportsAudio == true)
+        #expect(ContainerFormat.gif.supportsAudio == false)
+    }
+
     // MARK: - fileExtension
 
     @Test func fileExtension() {
         #expect(ContainerFormat.mov.fileExtension == "mov")
         #expect(ContainerFormat.mp4.fileExtension == "mp4")
+        #expect(ContainerFormat.gif.fileExtension == "gif")
     }
 
     // MARK: - Identifiable & RawValue
@@ -56,6 +74,7 @@ struct ContainerFormatTests {
     @Test func rawValues() {
         #expect(ContainerFormat.mov.rawValue == "mov")
         #expect(ContainerFormat.mp4.rawValue == "mp4")
+        #expect(ContainerFormat.gif.rawValue == "gif")
     }
 
     @Test func identifiable() {
@@ -65,6 +84,6 @@ struct ContainerFormatTests {
     }
 
     @Test func allCasesCount() {
-        #expect(ContainerFormat.allCases.count == 2)
+        #expect(ContainerFormat.allCases.count == 3)
     }
 }

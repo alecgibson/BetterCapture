@@ -119,6 +119,19 @@ final class NotificationService: NSObject {
         )
     }
 
+    /// Sends a notification for a GIF recording that was saved as a video because the GIF export failed
+    /// - Parameters:
+    ///   - fileURL: The URL of the saved video file
+    ///   - error: The error that stopped the GIF export
+    func sendGIFExportFailedNotification(fileURL: URL, error: Error) {
+        send(
+            title: "Recording Saved as Video",
+            body: "The recording was saved to \(fileURL.lastPathComponent) because the GIF could not be created: \(error.localizedDescription)",
+            category: NotificationIdentifier.categoryRecordingSaved,
+            folderURL: fileURL.deletingLastPathComponent()
+        )
+    }
+
     /// Sends a notification for a recording that could not be started
     ///
     /// Start failures leave nothing on disk, so they are reported separately from

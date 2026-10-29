@@ -446,11 +446,19 @@ struct VideoSettingsSection: View {
             }
 
             // Frame Rate Picker
-            MenuBarExpandablePicker(
-                name: "Frame Rate",
-                selection: $settings.frameRate,
-                options: FrameRate.allCases.map { ($0, $0.displayName) }
-            )
+            if settings.containerFormat == .gif {
+                MenuBarExpandablePicker(
+                    name: "Frame Rate",
+                    selection: $settings.gifFrameRate,
+                    options: GIFFrameRate.allCases.map { ($0, $0.displayName) }
+                )
+            } else {
+                MenuBarExpandablePicker(
+                    name: "Frame Rate",
+                    selection: $settings.frameRate,
+                    options: FrameRate.allCases.map { ($0, $0.displayName) }
+                )
+            }
 
             // Video Codec Picker (shows all codecs, disables incompatible ones)
             MenuBarExpandablePicker(
@@ -506,10 +514,18 @@ struct AudioSettingsSection: View {
             SectionHeader(title: "Audio")
 
             // System Audio Toggle
-            MenuBarToggle(name: "Capture System Audio", isOn: $settings.captureSystemAudio)
+            MenuBarToggle(
+                name: "Capture System Audio",
+                isOn: $settings.captureSystemAudio,
+                isDisabled: !settings.containerFormat.supportsAudio
+            )
 
             // Microphone Toggle
-            MenuBarToggle(name: "Capture Microphone", isOn: $settings.captureMicrophone)
+            MenuBarToggle(
+                name: "Capture Microphone",
+                isOn: $settings.captureMicrophone,
+                isDisabled: !settings.containerFormat.supportsAudio
+            )
 
             // Microphone Source Picker (only shown when microphone is enabled)
             if settings.captureMicrophone {
