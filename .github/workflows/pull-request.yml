@@ -28,7 +28,7 @@ jobs:
         run: brew install swiftlint
 
       - name: Run SwiftLint
-        run: swiftlint lint --reporter github-actions-logging
+        run: swiftlint lint --strict --reporter github-actions-logging
 
   build:
     name: Build
@@ -47,6 +47,7 @@ jobs:
 
       - name: Build application
         run: |
+          set -o pipefail
           xcodebuild build \
             -project "${{ env.APP_NAME }}.xcodeproj" \
             -scheme "${{ env.SCHEME }}" \
@@ -54,7 +55,7 @@ jobs:
             -destination "platform=macOS" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            | xcbeautify --renderer github-actions || true
+            | xcbeautify --renderer github-actions
 
   test:
     name: Test
@@ -71,11 +72,12 @@ jobs:
 
       - name: Run tests
         run: |
+          set -o pipefail
           xcodebuild test \
             -project "${{ env.APP_NAME }}.xcodeproj" \
             -scheme "${{ env.SCHEME }}" \
             -destination "platform=macOS" \
             CODE_SIGN_IDENTITY="-" \
             CODE_SIGNING_REQUIRED=NO \
-            | xcbeautify --renderer github-actions || true
+            | xcbeautify --renderer github-actions
 
