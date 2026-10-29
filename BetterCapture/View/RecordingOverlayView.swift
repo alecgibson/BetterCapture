@@ -37,7 +37,7 @@ struct RecordingOverlayView: View {
             if let image = currentPreview {
                 Image(nsImage: image)
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .scaledToFit()
                     .clipShape(.rect(cornerRadius: 8))
             } else {
                 RoundedRectangle(cornerRadius: 8)

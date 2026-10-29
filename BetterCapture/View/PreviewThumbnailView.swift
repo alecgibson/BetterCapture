@@ -22,7 +22,7 @@ struct PreviewThumbnailView: View {
                 ZStack {
                     Image(nsImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
+                        .scaledToFit()
                         .clipShape(.rect(cornerRadius: 8))
 
                     // Play/Stop button overlay
